@@ -1,0 +1,13 @@
+*.swo
+*.swp
+*.pyc
+.DS_Store
+*.tar
+*.png
+.ipynb_checkpoints/
+__pycache__/
+*.pdf
+*.npz
+advertorch/__pycache__/
+advertorch.egg-info
+data/

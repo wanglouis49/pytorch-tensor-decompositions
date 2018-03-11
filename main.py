@@ -14,11 +14,14 @@ import time
 import tensorly as tl
 import tensorly
 from itertools import chain
-from decompositions import cp_decomposition_conv_layer, tucker_decomposition_conv_layer
+from decompositions import cp_decomposition_conv_layer
+from decompositions import tucker_decomposition_conv_layer
 
 # VGG16 based network for classifying between dogs and cats.
 # After training this will be an over parameterized network,
 # with potential to shrink it.
+
+
 class ModifiedVGG16Model(torch.nn.Module):
     def __init__(self, model=None):
         super(ModifiedVGG16Model, self).__init__()
@@ -40,6 +43,7 @@ class ModifiedVGG16Model(torch.nn.Module):
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
         return x
+
 
 class Trainer:
     def __init__(self, train_path, test_path, model, optimizer):
@@ -67,7 +71,7 @@ class Trainer:
             pred = output.data.max(1)[1]
             correct += pred.cpu().eq(label).sum()
             total += label.size(0)
-        
+
         print("Accuracy :", float(correct) / total)
         print("Average prediction time", float(total_time) / (i + 1), i + 1)
 
@@ -79,7 +83,6 @@ class Trainer:
             self.train_epoch()
             self.test()
         print("Finished fine tuning.")
-        
 
     def train_batch(self, batch, label):
         self.model.zero_grad()
@@ -91,21 +94,25 @@ class Trainer:
         for i, (batch, label) in enumerate(self.train_data_loader):
             self.train_batch(batch.cuda(), label.cuda())
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", dest="train", action="store_true")
     parser.add_argument("--decompose", dest="decompose", action="store_true")
     parser.add_argument("--fine_tune", dest="fine_tune", action="store_true")
-    parser.add_argument("--train_path", type = str, default = "train")
-    parser.add_argument("--test_path", type = str, default = "test")
-    parser.add_argument("--cp", dest="cp", action="store_true", \
-        help="Use cp decomposition. uses tucker by default")
+    parser.add_argument("--train_path", type=str,
+                        default="../data/dogs-vs-cats/train")
+    parser.add_argument("--test_path", type=str,
+                        default="../data/dogs-vs-cats/test1")
+    parser.add_argument("--cp", dest="cp", action="store_true",
+                        help="Use cp decomposition. uses tucker by default")
     parser.set_defaults(train=False)
     parser.set_defaults(decompose=False)
     parser.set_defaults(fine_tune=False)
-    parser.set_defaults(cp=False)    
+    parser.set_defaults(cp=False)
     args = parser.parse_args()
     return args
+
 
 if __name__ == '__main__':
     args = get_args()
@@ -113,10 +120,11 @@ if __name__ == '__main__':
 
     if args.train:
         model = ModifiedVGG16Model().cuda()
-        optimizer = optim.SGD(model.classifier.parameters(), lr=0.0001, momentum=0.99)
+        optimizer = optim.SGD(model.classifier.parameters(),
+                              lr=0.0001, momentum=0.99)
         trainer = Trainer(args.train_path, args.test_path, model, optimizer)
 
-        trainer.train(epoches = 10)
+        trainer.train(epoches=10)
         torch.save(model, "model")
 
     elif args.decompose:
@@ -128,10 +136,11 @@ if __name__ == '__main__':
 
             if i >= N - 2:
                 break
-            if isinstance(model.features._modules[key], torch.nn.modules.conv.Conv2d):
+            if isinstance(model.features._modules[key],
+                          torch.nn.modules.conv.Conv2d):
                 conv_layer = model.features._modules[key]
                 if args.cp:
-                    rank = max(conv_layer.weight.data.numpy().shape)//3
+                    rank = max(conv_layer.weight.data.numpy().shape) // 3
                     decomposed = cp_decomposition_conv_layer(conv_layer, rank)
                 else:
                     decomposed = tucker_decomposition_conv_layer(conv_layer)
@@ -139,7 +148,6 @@ if __name__ == '__main__':
                 model.features._modules[key] = decomposed
 
             torch.save(model, 'decomposed_model')
-
 
     elif args.fine_tune:
         base_model = torch.load("decomposed_model")
@@ -149,7 +157,7 @@ if __name__ == '__main__':
             param.requires_grad = True
 
         print(model)
-        model.cuda()        
+        model.cuda()
 
         if args.cp:
             optimizer = optim.SGD(model.parameters(), lr=0.000001)
@@ -157,7 +165,6 @@ if __name__ == '__main__':
             # optimizer = optim.SGD(chain(model.features.parameters(), \
             #     model.classifier.parameters()), lr=0.01)
             optimizer = optim.SGD(model.parameters(), lr=0.001)
-
 
         trainer = Trainer(args.train_path, args.test_path, model, optimizer)
 
